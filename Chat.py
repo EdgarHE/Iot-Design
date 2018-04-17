@@ -27,23 +27,28 @@ def server_thread(HOST, PORT):
 		sock, addr = s.accept()
 		TCP(sock, addr)
 		
-def client_thread(HOST, PORT):
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-	
+def client_thread( HOST, PORT):
+    # Create a socket (SOCK_STREAM means a TCP socket)
+	print 'Ready to connect to %s' % (HOST)
+	raw_input("Press enter to begin connection")
+	#i = 1
 	while True:
-		data = raw_input()
-			
+		temp = 20
+		lum = 60
+		dis = 5
+		data = 'temp:' +  str(temp) +';'
+		data = data + 'lum:'+ str(lum) +';'
+
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		try:
-			s.connect((HOST, PORT))
-			if data == '-quit-':
-				s.send(b'-quit-')
-				break
-			s.send(data.encode())
+			# Connect to server and send data
+			sock.connect((HOST, PORT))
+			sock.sendall(data+ "\n")
+			time.sleep(1)
+
 		finally:
-			s.close()
-	
-	s.close()
-	
+			sock.close()
+
 HOST = ''
 PORT = 8888
 if len(sys.argv) != 2:
@@ -57,6 +62,3 @@ except:
    
 while 1:
 	pass
-		
-		
-	
