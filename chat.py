@@ -43,7 +43,7 @@ def client_thread( HOST, PORT):
 		try:
 			# Connect to server and send data
 			sock.connect((HOST, PORT))
-			sock.sendall(data+ "\n")
+			sock.sendall(data)
 			time.sleep(1)
 
 		finally:
@@ -56,7 +56,7 @@ if len(sys.argv) != 2:
 	exit(0)
 try:
 	thread.start_new_thread( server_thread, (HOST, PORT, ) )
-	thread.start_new_thread( client_thread, (sys.argv[1], PORT, ) )
+	#thread.start_new_thread( client_thread, (sys.argv[1], PORT, ) )
 except:
 	print "Error: unable to start thread"
    
