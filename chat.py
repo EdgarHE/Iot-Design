@@ -4,17 +4,41 @@ import threading
 import thread
 import sys
 
+indoorillum = -1
+indoortemp = -1
+time_sleep = '----'
+time_wake = '----'
+
+
 def TCP(sock, addr): 
 	while True:
 		data = sock.recv(1024) 
 		time.sleep(1) 
 		if not data or data.decode() == '-quit-': 
 			break
+
 		print data
-        #sock.send(data.decode('utf-8').upper().encode()) 
+
+		length = len(data.split(';'))-1
+		
+		for i in range(0, length):
+			if  data.split(';')[i].split(':')[0] == 'indoortemp':
+				indoortemp = int(data.split(';')[i].split(':')[1])
+			if  data.split(';')[i].split(':')[0] == 'indoorillum':
+				indoorillum = int(data.split(';')[i].split(':')[1])
+			if  data.split(';')[i].split(':')[0] == 'sleeptime':
+				time_sleep = data.split(';')[i].split(':')[1]
+			if  data.split(';')[i].split(':')[0] == 'wakeuptime':
+				time_wake = data.split(';')[i].split(':')[1]	
+		print 'indoortemp: %d' %indoortemp
+		print 'indoorillum: %d' %indoorillum
+		print 'sleeptime: %s' %time_sleep
+		print 'wakeuptime: %s' %time_wake
+		
+        
 
 	sock.close() 
-	#print('Connection from %s:%s closed.' %addr) 
+
 
 def server_thread(HOST, PORT):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
