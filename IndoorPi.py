@@ -7,13 +7,17 @@ import sys
 import PCF8591 as ADC
 import RPi.GPIO as GPIO
 
-lum = 0
-temp=0
-sleep_status=0
-led_status=0
+inlum = 0
+#outlum = 0
+intemp = 0
+inhumid = 0
 currtime = '----'
-iscoffee = 0
-curtain = 0
+sleepstatus = 0
+joystatus = 'home'
+
+ledStatus = 0
+coffeeStatus = -1
+curtainStatus = -1
 aircondition = -1
 
 
@@ -77,10 +81,14 @@ def client_thread( HOST, PORT):
 			
 		currtime = timehr + timemin
 		
-		data = 'indoortemp:' +  str(temp) +';'
-		data = data + 'indoorillum:'+ str(lum) +';'
-		data = data + 'currenttime:'+ str(currtime) +';'
-		data = data + 'ledstatus:'+ str(led_status) +';'
+		data = 'indoorTemp:' +  str(intemp) +';'
+		data = data + 'indoorHumid:'+ str(inhumid) +';'
+		data = data + 'indoorIllum:'+ str(inlum) +';'
+		data = data + 'currentTime:'+ str(currtime) +';'
+		data = data + 'sleepStatus:'+ str(sleepstatus) +';'
+		data = data + 'joyStatus:'+ str(joystatus) +';'
+		
+		print data
 		
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		try:
@@ -94,28 +102,52 @@ def client_thread( HOST, PORT):
 
 
 
-'''photoresistor'''
-def lumsetup():
+'''Indoorphotoresistor'''
+def inlumsetup():
 	ADC.setup(0x48)
 
-def lumloop():
-	status = 1
+def inlumloop():
+	#status = 1
 	while True:
-		global lum
-		lum = ADC.read(0)
-		#print 'Value: ', ADC.read(0)
+		global inlum
+		inlum = ADC.read(0)
+		#print 'inValue: ', ADC.read(0)
+		#print 'outValue: ', ADC.read(2)
 		
 		time.sleep(1)
 		
-def lumsensor():
+def inlumsensor():
 	try:
-		lumsetup()
-		lumloop()
+		#inlumsetup()
+		inlumloop()
 		
 	except KeyboardInterrupt: 
 		pass
 		
+'''Outdoorphotoresistor'''
+'''
+def outlumsetup():
+	ADC.setup(0x48)
+
+def outlumloop():
+	#status = 1
+	while True:
+		global outlum
+		outlum = ADC.read(1)
+		print 'outValue: ', ADC.read(1)
 		
+		time.sleep(1)
+		
+def outlumsensor():
+	try:
+		#outlumsetup()
+		outlumloop()
+		
+	except KeyboardInterrupt: 
+		pass
+'''
+
+
 '''humiture sensor'''
 def humituresetup():
 	GPIO.setmode(GPIO.BCM)
@@ -220,9 +252,11 @@ def humituremain():
 		result = read_dht11_dat()
 		if result:
 			humidity, temperature = result
-			global temp
-			temp = int(temperature)
-			#print "Temperature: %d C`" %temp
+			global intemp
+			global inhumid
+			intemp = int(temperature)
+			inhumid = int(humidity)
+			#print "Temperature: %d C`" %intemp
 			#print "humidity: %s %%,  Temperature: %s C`" % (humidity, temperature)
 		time.sleep(1)	
 
@@ -254,7 +288,7 @@ def ledout(status):
 		
 def ledmain():
 	while True:
-		ledout(sleep_status)
+		ledout(sleepstatus)
 		time.sleep(1)
 	
 def leddestroy():
@@ -278,23 +312,15 @@ def btnsetup():
 	GPIO.add_event_detect(BTNPIN, GPIO.BOTH, callback=btndetect, bouncetime=200)
 
 def btndetect(chn):
-	global sleep_status
+	global sleepstatus
 	global time_sleep
 	global time_wake
 	
-	if sleep_status == 0:
-		sleep_status = 1
+	if sleepstatus == 0:
+		sleepstatus = 1
 	
 	else:
-		sleep_status = 0
-		
-		
-		
-	
-	#print sleep_status
-	
-	#print time.localtime(time.time()).tm_hour
-	#print time.localtime(time.time()).tm_min
+		sleepstatus = 0
 	
 def btnloop():
 	while True:
@@ -306,22 +332,56 @@ def btnsensor():
 		btnloop()
 	except KeyboardInterrupt, e: 
 		pass
+		
+'''Joystick'''
+def joydirection():
+	i = 0
+	if ADC.read(1) <= 50:
+		i = 1		#left
+	if ADC.read(1) >= 200:
+		i = 2		#right
+	if ADC.read(0)  < 150 and ADC.read(0)  > 100	and ADC.read(1)  < 150 and ADC.read(1)  > 100:
+		i = 0
+	return i
+
+def joyloop():
+	global joystatus
+	while True:
+		tmp = joydirection()
+
+		if tmp != None and tmp != joystatus:
+			#print tmp
+			joystatus = tmp
+		time.sleep(0.05)
+
+def joysensor():
+	try:
+		joyloop()
+	except KeyboardInterrupt:
+		destroy()
+		
+'''lumsetup'''
+def lumsetup():
+	ADC.setup(0x48)
 
 '''MAIN'''
 HOST = ''
 PORT = 8888
 if len(sys.argv) != 2:
-    print "Usage: python PiChat <Destination IP"
-    exit(0)
+	print "Usage: python PiChat <Destination IP"
+	exit(0)
 try:
-   thread.start_new_thread( server_thread, (HOST, PORT, ) )
-   thread.start_new_thread( client_thread, (sys.argv[1], PORT, ) )
-   thread.start_new_thread( lumsensor, () )
-   thread.start_new_thread( humituresensor, () )
-   thread.start_new_thread( ledsensor, () )
-   thread.start_new_thread( btnsensor, () )
+	lumsetup()
+	thread.start_new_thread( server_thread, (HOST, PORT, ) )
+	thread.start_new_thread( client_thread, (sys.argv[1], PORT, ) )
+	thread.start_new_thread( inlumsensor, () )
+	#thread.start_new_thread( outlumsensor, () )
+	thread.start_new_thread( humituresensor, () )
+	thread.start_new_thread( ledsensor, () )
+	thread.start_new_thread( btnsensor, () )
+	thread.start_new_thread( joysensor, () )
 except:
-   print "Error: unable to start thread"
+	print "Error: unable to start thread"
 
 while 1:
-   pass
+	pass
