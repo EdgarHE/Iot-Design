@@ -10,13 +10,14 @@ import RPi.GPIO as GPIO
 inlum = 0
 #outlum = 0
 intemp = 0
-currtime = '----'
-sleepstatus = 0
-joystatus = 'home'
+humid = 0
+currtime = 0
+sleepstatus = 0 # 1:sleep
+joystatus = 0 #0:home 1:left 2:right
 
-ledStatus = 0
-coffeeStatus = -1
-curtainStatus = -1
+ledStatus = 1 # 0:light 1:no
+coffeeStatus = 0 # -1:question 0:nothing 1:hot 2:cold
+curtainStatus = -1 # 0: open 1: close
 aircondition = -1
 
 
@@ -34,72 +35,89 @@ STATE_DATA_FIRST_PULL_DOWN = 3
 STATE_DATA_PULL_UP = 4
 STATE_DATA_PULL_DOWN = 5
 
+
 '''
-TCP Socket with Server and Client
+UDP Socket with Server
 '''
-def TCP(sock, addr): 
+def server_thread_coffee(HOST, PORT):
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
+ 
+	addr = (HOST, PORT)
+
 	while True:
-		data = sock.recv(1024) 
-		time.sleep(1) 
-		if not data or data.decode() == '-quit-': 
-			break
-		print data
+		dataudp = 'coffeeStatus:' +  str(coffeeStatus) +';'
+		#dataudp = dataudp + 'curtainStatus:'+ str(curtainStatus) +';'
+		
+		s.sendto(dataudp, addr)
+		time.sleep(1)
+		#recvdata, addr = s.recvfrom(1024)
+		#print(recvdata.decode('utf-8'))
 
-	sock.close() 
+	s.close()  
+	
+def server_thread_curt(HOST, PORT):
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
+ 
+	addr = (HOST, PORT)
 
-# Define the server function for the thread
-def server_thread(HOST, PORT):
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.bind((HOST, PORT))
-	s.listen(1) 
-	print('\nServer is running...\n')
-	sock, addr = s.accept()
-	print('Accept new connection from %s.' %addr[0])
 	while True:
-		sock, addr = s.accept()
-		TCP(sock, addr)
+		dataudp = 'curtainStatus:' +  str(curtainStatus) +';'
+		#dataudp = dataudp + 'curtainStatus:'+ str(curtainStatus) +';'
+		
+		s.sendto(dataudp, addr)
+		time.sleep(0.1)
+		#recvdata, addr = s.recvfrom(1024)
+		#print(recvdata.decode('utf-8'))
 
-# Define the client function for the thread
+	s.close()  
+
+'''
+UDP Socket with Client
+'''
 def client_thread( HOST, PORT):
-    # Create a socket (SOCK_STREAM means a TCP socket)
-	print 'Ready to connect to %s' % (HOST)
-	raw_input("Press enter to begin connection")
+	global ledStatus
+	global coffeeStatus
+	global curtainStatus
+	
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
+	addr = (HOST, PORT)
+
 	while True:
-		hour = time.localtime(time.time()).tm_hour 
-		minute = time.localtime(time.time()).tm_min
-		timehr = ''
-		timemin = ''
-		if hour < 10:
-			timehr = '0' + str(hour)
-		else:
-			timehr = str(hour)
-		if hour < 10:
-			timemin = '0' + str(minute)
-		else:
-			timemin = str(minute)
+		timehr = time.localtime(time.time()).tm_hour 
+		timemin = time.localtime(time.time()).tm_min
 			
-		currtime = timehr + timemin
+		currtime = 60*timehr + timemin
 		
 		data = 'indoorTemp:' +  str(intemp) +';'
+		data = data + 'humidity:'+ str(humid) +';'
 		data = data + 'indoorIllum:'+ str(inlum) +';'
 		data = data + 'currentTime:'+ str(currtime) +';'
 		data = data + 'sleepStatus:'+ str(sleepstatus) +';'
 		data = data + 'joyStatus:'+ str(joystatus) +';'
 		
+		s.sendto(data, addr)
+		print data
+		time.sleep(0.1)
 		
-		data1 = str(joystatus)
-		print data1
+		data1 = s.recv(1024)
+			
+		length = len(data1.split(';'))-1
 		
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		try:
-			# Connect to server and send data
-			sock.connect((HOST, PORT))
-			sock.sendall(data1)
-			time.sleep(1)
+		for i in range(0, length):
+			if  data1.split(';')[i].split(':')[0] == 'ledStatus':
+				ledStatus = int(data1.split(';')[i].split(':')[1])
+			if  data1.split(';')[i].split(':')[0] == 'coffeeStatus':
+				coffeeStatus = int(data1.split(';')[i].split(':')[1])
+			if  data1.split(';')[i].split(':')[0] == 'curtainStatus':
+				curtainStatus = float(data1.split(';')[i].split(':')[1])
 
-		finally:
-			sock.close()
-
+		#print 'ledstatus %d'%ledStatus
+		#print 'coffeeStatus %s'%coffeeStatus
+		#print 'curtainStatus %f'%curtainStatus
+		time.sleep(0.3)
+		
+	s.close()  
+	
 
 
 '''Indoorphotoresistor'''
@@ -124,29 +142,6 @@ def inlumsensor():
 	except KeyboardInterrupt: 
 		pass
 		
-'''Outdoorphotoresistor'''
-'''
-def outlumsetup():
-	ADC.setup(0x48)
-
-def outlumloop():
-	#status = 1
-	while True:
-		global outlum
-		outlum = ADC.read(1)
-		print 'outValue: ', ADC.read(1)
-		
-		time.sleep(1)
-		
-def outlumsensor():
-	try:
-		#outlumsetup()
-		outlumloop()
-		
-	except KeyboardInterrupt: 
-		pass
-'''
-
 
 '''humiture sensor'''
 def humituresetup():
@@ -253,9 +248,9 @@ def humituremain():
 		if result:
 			humidity, temperature = result
 			global intemp
-			global inhumid
+			global humid
 			intemp = int(temperature)
-			#inhumid = int(humidity)
+			humid = int(humidity)
 			#print "Temperature: %d C`" %intemp
 			#print "humidity: %s %%,  Temperature: %s C`" % (humidity, temperature)
 		time.sleep(1)	
@@ -288,7 +283,7 @@ def ledout(status):
 		
 def ledmain():
 	while True:
-		ledout(sleepstatus)
+		ledout(ledStatus)
 		time.sleep(1)
 	
 def leddestroy():
@@ -313,8 +308,6 @@ def btnsetup():
 
 def btndetect(chn):
 	global sleepstatus
-	global time_sleep
-	global time_wake
 	
 	if sleepstatus == 0:
 		sleepstatus = 1
@@ -324,7 +317,7 @@ def btndetect(chn):
 	
 def btnloop():
 	while True:
-		pass
+		time.sleep(0.1)
 		
 def btnsensor():
 	btnsetup()
@@ -353,7 +346,7 @@ def joyloop():
 		if tmp != None and tmp != joystatus:
 			#print tmp
 			joystatus = tmp
-		time.sleep(0.05)
+		time.sleep(0.02)
 
 def joysensor():
 	try:
@@ -368,12 +361,15 @@ def lumsetup():
 '''MAIN'''
 HOST = ''
 PORT = 8888
+PORTcoff = 9999
+PORTcurt = 8989
 if len(sys.argv) != 2:
 	print "Usage: python PiChat <Destination IP"
 	exit(0)
 try:
 	lumsetup()
-	thread.start_new_thread( server_thread, (HOST, PORT, ) )
+	thread.start_new_thread( server_thread_coffee, (HOST, PORTcoff, ) )
+	thread.start_new_thread( server_thread_curt, (HOST, PORTcurt, ) )
 	thread.start_new_thread( client_thread, (sys.argv[1], PORT, ) )
 	thread.start_new_thread( inlumsensor, () )
 	##thread.start_new_thread( outlumsensor, () )
