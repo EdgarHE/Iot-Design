@@ -2,84 +2,79 @@ import time
 import sys
 import socket
 import thread
-import threading
 
 temp = 0
-joystatus = 0
+curtainStatus = -1
 
 bar_length=50
 
-def TCP(sock, addr): 
-	while True:
-		global joystatus
-		data = sock.recv(1024) 
-		time.sleep(0.1)
-		if not data: 
-			break
-		#print data
-		joystatus = int(data)
+def client_thread(HOST, PORT):
+	global curtainStatus
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-	sock.close() 
-
-# Define the server function for the thread
-def server_thread(HOST, PORT):
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.bind((HOST, PORT))
-	s.listen(1) 
-	#print('\nServer is running...\n')
-	sock, addr = s.accept()
-	#print('Accept new connection from %s.' %addr[0])
-	while True:
-		sock, addr = s.accept()
-		TCP(sock, addr)
+
+	#print('Bound UDP on %d...'%PORT)
+
+	while True:                                          
+		data, addr = s.recvfrom(1024)
+		#print data
 		
+		length = len(data.split(';'))-1
+		for i in range(0, length):
+			if  data.split(';')[i].split(':')[0] == 'curtainStatus':
+				tempstatus = float(data.split(';')[i].split(':')[1])
+				#print tempstatus
+				if tempstatus > -1:
+					curtainStatus = int(100 * tempstatus)
+
+		#print 'curtainStatus %d'%curtainStatus
+
+
+def progress(x):
+	global temp
+	if temp < x:
+		while temp < x:
+			temp = temp + 1
+			hashes = '=' * int((temp)/100.0 * bar_length)
+			spaces = ' ' * (bar_length - len(hashes))
+			sys.stdout.write("\rCurtain: [%s] %d%% "%(hashes + spaces, temp))
+			sys.stdout.flush()
+			time.sleep(0.05)
+	elif temp > x:
+		while temp > x:
+			temp = temp - 1
+			hashes = '=' * int((temp)/100.0 * bar_length)
+			spaces = ' ' * (bar_length - len(hashes))
+			sys.stdout.write("\rCurtain: [%s] %d%% "%(hashes + spaces, temp))
+			sys.stdout.flush()  
+			time.sleep(0.05)
 		
-def progress_right(x):
-    global temp
-    while temp < x:
-        temp = temp + 1
-        hashes = '=' * int((temp)/100.0 * bar_length)
-        spaces = ' ' * (bar_length - len(hashes))
-        sys.stdout.write("\rPercent: [%s] %d%% "%(hashes + spaces, temp))
-        sys.stdout.flush()
-        time.sleep(0.01)
-        
-    
-def progress_left(x):
-    global temp
-    while temp > x:
-        temp = temp - 1
-        hashes = '=' * int((temp)/100.0 * bar_length)
-        spaces = ' ' * (bar_length - len(hashes))
-        sys.stdout.write("\rPercent: [%s] %d%% "%(hashes + spaces, temp))
-        sys.stdout.flush()
-        
-        time.sleep(0.01)
-    #temp = x
 
 def runcurtain():
 	try:
-                hashes = '=' * int((temp)/100.0 * bar_length)
-                spaces = ' ' * (bar_length - len(hashes))
-                sys.stdout.write("\rPercent: [%s] %d%% "%(hashes + spaces, temp))
-                sys.stdout.flush()
+		hashes = '=' * int((temp)/100.0 * bar_length)
+		spaces = ' ' * (bar_length - len(hashes))
+		sys.stdout.write("\rCurtain: [%s] %d%% "%(hashes + spaces, temp))
+		sys.stdout.flush()
 		while True:
-			if joystatus == 1 and temp > 1:
-				progress_left(temp-2)
-			elif joystatus == 2 and temp < 100:
-				progress_right(temp+2)
+			if curtainStatus != -1:
+					progress(curtainStatus)
+					
 	except KeyboardInterrupt, e: 
 		pass
 
 
 HOST = ''
 PORT = 8888
+PORTcurt = 8989
 try:
-	thread.start_new_thread( server_thread, (HOST, PORT, ) )
+	print ''
+	print "------------------ CURTAIN ------------------"
+	thread.start_new_thread( client_thread, (HOST, PORTcurt, ) )
 	thread.start_new_thread( runcurtain, () )
 except:
 	print "Error: unable to start thread"
 
 while 1:
 	pass
-
