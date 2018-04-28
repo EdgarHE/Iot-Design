@@ -99,7 +99,7 @@ PORT = 8888
 PORTcoff = 9999
 try:
 	print ''
-	print "-------------- COFFEE MACHINE --------------"
+	print "----------- COFFEE MACHINE -----------"
 	thread.start_new_thread( client_thread, (HOST, PORTcoff, ) )
 	thread.start_new_thread( runcoffee, () )
 except:
