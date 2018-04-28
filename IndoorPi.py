@@ -96,7 +96,7 @@ def client_thread( HOST, PORT):
 		data = data + 'joyStatus:'+ str(joystatus) +';'
 		
 		s.sendto(data, addr)
-		print data
+		#print data
 		time.sleep(0.1)
 		
 		data1 = s.recv(1024)
