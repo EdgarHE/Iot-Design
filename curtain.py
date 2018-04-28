@@ -70,7 +70,7 @@ PORT = 8888
 PORTcurt = 8989
 try:
 	print ''
-	print "------------------ CURTAIN ------------------"
+	print "---------------------------- CURTAIN ----------------------------"
 	thread.start_new_thread( client_thread, (HOST, PORTcurt, ) )
 	thread.start_new_thread( runcurtain, () )
 except:
